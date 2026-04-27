@@ -89,13 +89,29 @@ async def crop_image(
         content = await image.read()
         img = Image.open(BytesIO(content))
         
+        # 1. 获取原图的真实宽高
+        img_w, img_h = img.size
+        
         clean_text = boxes.replace("```json", "").replace("```", "").strip()
         box_list = json.loads(clean_text)
         
         results = []
         for item in box_list:
             box = item.get("box")
-            cropped_img = img.crop((box[0], box[1], box[2], box[3]))
+            
+            # 2. 核心修复：将 Qwen-VL 的千分位相对坐标转换回真实像素坐标
+            # 公式：(归一化坐标 / 1000) * 原图真实尺寸
+            x1 = int((box[0] / 1000.0) * img_w)
+            y1 = int((box[1] / 1000.0) * img_h)
+            x2 = int((box[2] / 1000.0) * img_w)
+            y2 = int((box[3] / 1000.0) * img_h)
+            
+            # 3. 防御性编程：防止坐标越界或反转导致 PIL 崩溃
+            x1, x2 = max(0, min(x1, x2)), min(img_w, max(x1, x2))
+            y1, y2 = max(0, min(y1, y2)), min(img_h, max(y1, y2))
+            
+            # 4. 使用换算后的真实坐标进行裁切
+            cropped_img = img.crop((x1, y1, x2, y2))
             
             buffered = BytesIO()
             cropped_img.save(buffered, format="JPEG")

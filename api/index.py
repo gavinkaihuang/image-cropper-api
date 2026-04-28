@@ -99,20 +99,41 @@ async def crop_image(
         for item in box_list:
             box = item.get("box")
             
-            # 2. 核心修复：将 Qwen-VL 的千分位相对坐标转换回真实像素坐标
-            # 公式：(归一化坐标 / 1000) * 原图真实尺寸
+            # # 2. 核心修复：将 Qwen-VL 的千分位相对坐标转换回真实像素坐标
+            # # 公式：(归一化坐标 / 1000) * 原图真实尺寸
+            # x1 = int((box[0] / 1000.0) * img_w)
+            # y1 = int((box[1] / 1000.0) * img_h)
+            # x2 = int((box[2] / 1000.0) * img_w)
+            # y2 = int((box[3] / 1000.0) * img_h)
+            
+            # # 3. 防御性编程：防止坐标越界或反转导致 PIL 崩溃
+            # x1, x2 = max(0, min(x1, x2)), min(img_w, max(x1, x2))
+            # y1, y2 = max(0, min(y1, y2)), min(img_h, max(y1, y2))
+            
+            # # 4. 使用换算后的真实坐标进行裁切
+            # cropped_img = img.crop((x1, y1, x2, y2))
+            
+            # 1. 原始的换算代码
             x1 = int((box[0] / 1000.0) * img_w)
             y1 = int((box[1] / 1000.0) * img_h)
             x2 = int((box[2] / 1000.0) * img_w)
             y2 = int((box[3] / 1000.0) * img_h)
             
-            # 3. 防御性编程：防止坐标越界或反转导致 PIL 崩溃
-            x1, x2 = max(0, min(x1, x2)), min(img_w, max(x1, x2))
-            y1, y2 = max(0, min(y1, y2)), min(img_h, max(y1, y2))
+            # 2. 【核心优化：非对称外扩补偿】
+            # 左侧切掉最严重，给足 8% 的外扩；右侧 4%；上下各 5%
+            pad_left = int(img_w * 0.08)
+            pad_right = int(img_w * 0.04)
+            pad_y = int(img_h * 0.05)
             
-            # 4. 使用换算后的真实坐标进行裁切
+            # 3. 计算新坐标，同时防御越界崩溃
+            x1 = max(0, x1 - pad_left)
+            y1 = max(0, y1 - pad_y)
+            x2 = min(img_w, x2 + pad_right)
+            y2 = min(img_h, y2 + pad_y)
+            
+            # 4. 使用补偿后的坐标进行裁切
             cropped_img = img.crop((x1, y1, x2, y2))
-            
+
             buffered = BytesIO()
             cropped_img.save(buffered, format="JPEG")
             img_base64 = base64.b64encode(buffered.getvalue()).decode('utf-8')

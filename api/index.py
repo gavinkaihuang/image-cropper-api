@@ -123,13 +123,16 @@ async def crop_image(
             # 左侧切掉最严重，给足 8% 的外扩；右侧 4%；上下各 5%
             pad_left = int(img_w * 0.08)
             pad_right = int(img_w * 0.04)
-            pad_y = int(img_h * 0.05)
+            # 顶部留 2% 防止切掉平方号或题干顶部
+            pad_top = int(img_h * 0.02)    
+            # 【关键】底部仅留 0.5% 到 1%，紧贴手写答案，防止切到下一题
+            pad_bottom = int(img_h * 0.005)
             
             # 3. 计算新坐标，同时防御越界崩溃
             x1 = max(0, x1 - pad_left)
-            y1 = max(0, y1 - pad_y)
+            y1 = max(0, y1 - pad_top)
             x2 = min(img_w, x2 + pad_right)
-            y2 = min(img_h, y2 + pad_y)
+            y2 = min(img_h, y2 + pad_bottom)
             
             # 4. 使用补偿后的坐标进行裁切
             cropped_img = img.crop((x1, y1, x2, y2))

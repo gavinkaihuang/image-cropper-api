@@ -149,4 +149,6 @@ async def crop_image(
         return JSONResponse(content={"cropped_array": results})
         
     except Exception as e:
-        return JSONResponse(content={"error": str(e)}, status_code=500)
+        # 【重要修改】：将 status_code 从 500 改为 400
+        # 并在错误信息里加上标识，方便我们在 Dify 里一眼认出
+        return JSONResponse(content={"error": f"Vercel 执行失败: {str(e)}"}, status_code=400)
